@@ -14,15 +14,15 @@ func TestNewBuffer(t *testing.T) {
 
 	a, b := NewBuffer(512), NewBuffer(512)
 
-	a.latest, b.latest = 129, 129
+	a.next, b.next = 129, 129
 	require.Equal(t, a, b)
-	require.EqualValues(t, a.Latest(), b.Latest())
+	require.EqualValues(t, a.Next(), b.Next())
 
 	a.Reset()
 	b.Reset()
 
 	require.Equal(t, a, b)
-	require.EqualValues(t, a.Latest(), b.Latest())
+	require.EqualValues(t, a.Next(), b.Next())
 }
 
 func TestBufferInsertRemove(t *testing.T) {
@@ -80,7 +80,7 @@ func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 		end := size + start - 1
 
 		buf := NewBuffer(size)
-		buf.latest = end + 1
+		buf.next = end + 1
 
 		// Populate buffer items.
 
@@ -139,7 +139,7 @@ func TestBufferRemoveRangeEdgeCases(t *testing.T) {
 	}
 }
 
-func TestBufferBitset(t *testing.T) {
+func TestBufferGenerateBitset32(t *testing.T) {
 	buf := NewBuffer(32)
 
 	for i := uint16(0); i < 32; i += 2 {
@@ -153,7 +153,7 @@ func TestBufferBitset(t *testing.T) {
 		require.True(t, (i&1 != 0 && bitset&1 == 0) || (i&1 == 0 && bitset&1 != 0))
 	}
 
-	buf.Insert(buf.latest, true)
+	buf.Insert(buf.next, true)
 
 	ack, bitset = buf.GenerateBitset32()
 	require.EqualValues(t, 31, ack)
@@ -163,7 +163,7 @@ func TestBufferRemoveRangeAll(t *testing.T) {
 	start, size := uint16(65535), uint16(512)
 
 	buf := NewBuffer(size)
-	buf.latest = size
+	buf.next = size
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i
@@ -193,7 +193,7 @@ func BenchmarkTestBufferRemoveRange(b *testing.B) {
 	start, size := uint16(65535), uint16(512)
 
 	buf := NewBuffer(size)
-	buf.latest = size
+	buf.next = size
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i

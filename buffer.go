@@ -5,7 +5,7 @@ import "math"
 
 // Buffer is a fast, fixed-sized rolling buffer that buffers entries based on an unsigned 16-bit integer.
 type Buffer struct {
-	latest  uint16
+	next    uint16
 	indices []uint32
 	entries []interface{}
 }
@@ -16,19 +16,19 @@ func NewBuffer(size uint16) *Buffer {
 		panic("BUG: size provided to seq.NewBuffer() must be a power of two")
 	}
 
-	return &Buffer{latest: 0, indices: make([]uint32, size), entries: make([]interface{}, size)}
+	return &Buffer{next: 0, indices: make([]uint32, size), entries: make([]interface{}, size)}
 }
 
 // Reset resets the buffer.
 func (b *Buffer) Reset() {
-	b.latest = 0
+	b.next = 0
 	emptyBufferIndices(b.indices)
 	emptyBufferEntries(b.entries)
 }
 
-// Latest returns the latest sequence number inserted/acknowledged by this buffer plus one.
-func (b *Buffer) Latest() uint16 {
-	return b.latest
+// Next returns the next expected sequence number inserted/acknowledged by this buffer.
+func (b *Buffer) Next() uint16 {
+	return b.next
 }
 
 // At returns the entry at seq, even if it might be stale.
@@ -53,7 +53,7 @@ func (b *Buffer) Exists(seq uint16) bool {
 // Outdated returns true if seq is capable of being stored in this buffer based on the largest sequence number
 // that has been inserted/acknowledged so far.
 func (b *Buffer) Outdated(seq uint16) bool {
-	return LT(seq, b.latest-uint16(len(b.entries)))
+	return LT(seq, b.next-uint16(len(b.entries)))
 }
 
 // Insert inserts a new item into this buffer indexed by seq, should seq not be outdated. It returns true if the
@@ -63,9 +63,9 @@ func (b *Buffer) Insert(seq uint16, item interface{}) bool {
 		return false
 	}
 
-	if GT(seq+1, b.latest) {
-		b.RemoveRange(b.latest, seq)
-		b.latest = seq + 1
+	if GT(seq+1, b.next) {
+		b.RemoveRange(b.next, seq)
+		b.next = seq + 1
 	}
 
 	i := seq % uint16(len(b.entries))
@@ -107,7 +107,7 @@ func (b *Buffer) RemoveRange(start, end uint16) {
 // minus i. It returns both the largest sequence number known thus far alongside the bitset as an unsigned 16-bit
 // integer and an unsigned 32-bit integer respectively.
 func (b *Buffer) GenerateBitset32() (ack uint16, ackBits uint32) {
-	ack = b.latest - 1
+	ack = b.next - 1
 
 	for idx, mask := uint16(0), uint32(1); idx < 32; idx, mask = idx+1, mask<<1 {
 		seq := ack - idx
