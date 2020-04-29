@@ -26,7 +26,7 @@ func (b *Buffer) Reset() {
 	emptyBufferEntries(b.entries)
 }
 
-// Next returns the next expected sequence number inserted/acknowledged by this buffer.
+// Next returns the next expected sequence number to be inserted/acknowledged by this buffer.
 func (b *Buffer) Next() uint16 {
 	return b.next
 }
