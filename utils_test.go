@@ -36,3 +36,17 @@ func TestEmptyBufferEntries(t *testing.T) {
 
 	require.NoError(t, quick.Check(f, nil))
 }
+
+func TestComparisonFuncs(t *testing.T) {
+	a, b := uint16(0), HalfMaxUint16
+	require.True(t, LTE(a, b))
+	require.False(t, GTE(a, b))
+
+	b++
+	require.False(t, LTE(a, b))
+	require.True(t, GTE(a, b))
+
+	a = b
+	require.True(t, LTE(a, b))
+	require.True(t, GTE(a, b))
+}

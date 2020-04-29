@@ -26,6 +26,11 @@ func (b *Buffer) Reset() {
 	emptyBufferEntries(b.entries)
 }
 
+// Latest returns the latest sequence number inserted/acknowledged by this buffer plus one.
+func (b *Buffer) Latest() uint16 {
+	return b.latest
+}
+
 // At returns the entry at seq, even if it might be stale.
 func (b *Buffer) At(seq uint16) interface{} {
 	return b.entries[seq%uint16(len(b.entries))]
@@ -97,11 +102,11 @@ func (b *Buffer) RemoveRange(start, end uint16) {
 	emptyBufferIndices(second)
 }
 
-// Bitset generates a 32-bit integer representative of a bitset where entries at index i are 1 if there exists an entry
-// in the buffer whose sequence number is equal to the largest sequence number inserted/acknowledged so far minus i. It
-// returns both the largest sequence number known thus far alongside the bitset as an unsigned 16-bit integer and a
-// unsigned 32-bit integer respectively.
-func (b *Buffer) Bitset() (ack uint16, ackBits uint32) {
+// GenerateBitset32 generates a 32-bit integer representative of a bitset where entries at index i are 1 if there exists
+// an entry in the buffer whose sequence number is equal to the largest sequence number inserted/acknowledged so far
+// minus i. It returns both the largest sequence number known thus far alongside the bitset as an unsigned 16-bit
+// integer and an unsigned 32-bit integer respectively.
+func (b *Buffer) GenerateBitset32() (ack uint16, ackBits uint32) {
 	ack = b.latest - 1
 
 	for idx, mask := uint16(0), uint32(1); idx < 32; idx, mask = idx+1, mask<<1 {
