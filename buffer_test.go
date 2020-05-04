@@ -123,6 +123,7 @@ func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 
 		buf := NewBuffer(size)
 		buf.next = end + 1
+		buf.oldest = end
 
 		// Populate buffer items.
 
@@ -206,6 +207,7 @@ func TestBufferRemoveRangeAll(t *testing.T) {
 
 	buf := NewBuffer(size)
 	buf.next = size
+	buf.oldest = size - 1
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i
@@ -236,6 +238,7 @@ func BenchmarkTestBufferRemoveRange(b *testing.B) {
 
 	buf := NewBuffer(size)
 	buf.next = size
+	buf.oldest = size - 1
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i

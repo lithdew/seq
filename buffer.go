@@ -1,7 +1,9 @@
 // Package seq is a fast implementation of sequence buffers described in Go with 100% unit test coverage.
 package seq
 
-import "math"
+import (
+	"math"
+)
 
 // Buffer is a fast, fixed-sized rolling buffer that buffers entries based on an unsigned 16-bit integer.
 type Buffer struct {
@@ -23,6 +25,7 @@ func NewBuffer(size uint16) *Buffer {
 // Reset resets the buffer.
 func (b *Buffer) Reset() {
 	b.next = 0
+	b.oldest = math.MaxUint16
 	emptyBufferIndices(b.indices)
 	emptyBufferEntries(b.entries)
 }
@@ -69,7 +72,11 @@ func (b *Buffer) Exists(seq uint16) bool {
 // Outdated returns true if seq is capable of being stored in this buffer based on the largest sequence number
 // that has been inserted/acknowledged so far.
 func (b *Buffer) Outdated(seq uint16) bool {
-	return LT(seq, b.next-uint16(len(b.entries)))
+	return LT(seq, b.next-b.Len())
+}
+
+func (b *Buffer) Invalid(seq uint16) bool {
+	return GT(seq, b.oldest+b.Len())
 }
 
 // Insert inserts a new item into this buffer indexed by seq, should seq not be outdated. It returns true if the
@@ -79,25 +86,42 @@ func (b *Buffer) Insert(seq uint16, item interface{}) bool {
 		return false
 	}
 
-	if GT(seq+1, b.next) {
-		b.RemoveRange(b.next, seq)
-		b.next = seq + 1
+	if b.Invalid(seq) {
+		return false
 	}
+
+	b.updateLatest(seq)
 
 	i := seq % uint16(len(b.entries))
 	b.indices[i] = uint32(seq)
 	b.entries[i] = item
 
+	b.updateOldest()
+
+	return true
+}
+
+func (b *Buffer) updateLatest(seq uint16) {
+	if GT(seq+1, b.next) {
+		b.RemoveRange(b.next, seq)
+		b.next = seq + 1
+	}
+}
+
+func (b *Buffer) updateOldest() {
 	for b.Exists(b.oldest + 1) {
 		b.oldest++
 	}
 
-	return true
+	if !b.Exists(b.oldest) {
+		b.oldest = b.Latest()
+	}
 }
 
 // Remove invalidates items and entries stored by the sequence number seq.
 func (b *Buffer) Remove(seq uint16) {
 	b.indices[seq%b.Len()] = math.MaxUint32
+	b.updateOldest()
 }
 
 // RemoveRange invalidates all items and entries with sequence numbers in the range [start, end].
@@ -121,6 +145,8 @@ func (b *Buffer) RemoveRange(start, end uint16) {
 
 	emptyBufferIndices(first)
 	emptyBufferIndices(second)
+
+	b.updateOldest()
 }
 
 // GenerateLatestBitset32 calls GenerateBitset32 on the latest known sequence number.

@@ -35,7 +35,7 @@ $ go test -bench=. -benchtime=10s
 goos: linux
 goarch: amd64
 pkg: github.com/lithdew/seq
-BenchmarkTestBufferInsert-8             499233990               24.5 ns/op             0 B/op          0 allocs/op
-BenchmarkTestBufferRemoveRange-8        233703596               52.3 ns/op             0 B/op          0 allocs/op
-BenchmarkTestBufferGenerateBitset32-8   74007890                142 ns/op              0 B/op          0 allocs/op
+BenchmarkTestBufferInsert-8                     327525945               35.6 ns/op             0 B/op          0 allocs/op
+BenchmarkTestBufferRemoveRange-8                243091503               51.3 ns/op             0 B/op          0 allocs/op
+BenchmarkTestBufferGenerateBitset32-8           84982886               137 ns/op               0 B/op          0 allocs/op
 ```
