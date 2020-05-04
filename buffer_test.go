@@ -52,6 +52,48 @@ func TestBufferInsertRemove(t *testing.T) {
 	}
 }
 
+func TestBufferOldest(t *testing.T) {
+	buf := NewBuffer(8)
+	require.EqualValues(t, math.MaxUint16, buf.oldest)
+
+	buf.Insert(0, true)
+	require.EqualValues(t, 0, buf.Oldest())
+
+	buf.Insert(3, true)
+	require.EqualValues(t, 0, buf.Oldest())
+
+	buf.Insert(4, true)
+	require.EqualValues(t, 0, buf.Oldest())
+
+	ack, ackBits := buf.GenerateOldestBitset32()
+
+	require.EqualValues(t, buf.Oldest(), ack)
+	for i := 0; i < 32; i++ {
+		if i == 0 {
+			require.True(t, ackBits&(1<<i) != 0)
+		} else {
+			require.True(t, ackBits&(1<<i) == 0)
+		}
+	}
+
+	buf.Insert(1, true)
+	require.EqualValues(t, 1, buf.Oldest())
+
+	buf.Insert(2, true)
+	require.EqualValues(t, 4, buf.Oldest())
+
+	ack, ackBits = buf.GenerateOldestBitset32()
+
+	require.EqualValues(t, buf.Oldest(), ack)
+	for i := 0; i < 32; i++ {
+		if i < 5 {
+			require.True(t, ackBits&(1<<i) != 0)
+		} else {
+			require.True(t, ackBits&(1<<i) == 0)
+		}
+	}
+}
+
 func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 	t.Helper()
 
@@ -64,7 +106,7 @@ func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 			size++
 		}
 
-		// Round size to the nearest power of 2.
+		// Round size to the nearest power of two.
 
 		size--
 		size |= size >> 1

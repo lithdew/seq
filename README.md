@@ -16,7 +16,7 @@ The sequence numbers used to buffer entries are fixed to be unsigned 16-bit inte
 
 ## Notes
 
-The size of the buffer must be a power of two, otherwise data buffered by sequence numbers would not wrap around the entire buffer. This was encountered while writing tests for this library.
+The size of the buffer must be divisible by the max value of an unsigned 16-bit integer (65536), otherwise data buffered by sequence numbers would not wrap around the entire buffer. This was encountered while writing tests for this library.
 
 The method `RemoveRange` was benchmarked and optimized over the sequence buffer implementation in the reference C codebase [reliable.io](https://github.com/networkprotocol/reliable.io) to use a few `memcpy` calls over for loops.
 
