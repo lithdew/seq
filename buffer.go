@@ -5,34 +5,23 @@ import (
 	"math"
 )
 
-// ItemAcked may be passed in via WithBufferItemAcked to set conditions when an item is considered to be acknowledged.
-type ItemAcked func(seq uint16, item interface{}) bool
-
 // Buffer is a fast, fixed-sized rolling buffer that buffers entries based on an unsigned 16-bit integer.
 type Buffer struct {
-	oldest  uint16
 	next    uint16
 	indices []uint32
 	entries []interface{}
-
-	itemAcked ItemAcked
 }
 
 // NewBuffer instantiates a new sequence buffer of size.
-func NewBuffer(size uint16, opts ...BufferOption) *Buffer {
+func NewBuffer(size uint16) *Buffer {
 	if 65536%uint64(size) != 0 {
 		panic("BUG: size provided to seq.NewBuffer() must be divisible by 65536")
 	}
 
 	buf := &Buffer{
 		next:    0,
-		oldest:  0,
 		indices: make([]uint32, size),
 		entries: make([]interface{}, size),
-	}
-
-	for _, opt := range opts {
-		opt(buf)
 	}
 
 	return buf
@@ -41,7 +30,6 @@ func NewBuffer(size uint16, opts ...BufferOption) *Buffer {
 // Reset resets the buffer.
 func (b *Buffer) Reset() {
 	b.next = 0
-	b.oldest = 0
 	emptyBufferIndices(b.indices)
 	emptyBufferEntries(b.entries)
 }
@@ -59,11 +47,6 @@ func (b *Buffer) Next() uint16 {
 // Latest returns the latest sequence number inserted/acknowledged by this buffer.
 func (b *Buffer) Latest() uint16 {
 	return b.next - 1
-}
-
-// Oldest returns the last/oldest consecutively-inserted packet sequence number in this buffer.
-func (b *Buffer) Oldest() uint16 {
-	return b.oldest
 }
 
 // At returns the entry at seq, even if it might be stale.
@@ -91,19 +74,10 @@ func (b *Buffer) Outdated(seq uint16, size uint16) bool {
 	return LT(seq, b.next-size)
 }
 
-// Overdated returns true if inserting seq into the buffer is going to roll the buffer over.
-func (b *Buffer) Overdated(seq uint16, size uint16) bool {
-	return GTE(seq, b.oldest+size)
-}
-
 // Insert inserts a new item into this buffer indexed by seq, should seq not be outdated. It returns true if the
 // insertion is successful.
 func (b *Buffer) Insert(seq uint16, item interface{}) bool {
 	if b.Outdated(seq, b.Len()) {
-		return false
-	}
-
-	if b.Overdated(seq, b.Len()) {
 		return false
 	}
 
@@ -112,8 +86,6 @@ func (b *Buffer) Insert(seq uint16, item interface{}) bool {
 	i := seq % uint16(len(b.entries))
 	b.indices[i] = uint32(seq)
 	b.entries[i] = item
-
-	b.updateOldest()
 
 	return true
 }
@@ -125,30 +97,9 @@ func (b *Buffer) updateLatest(seq uint16) {
 	}
 }
 
-func (b *Buffer) updateOldest() {
-	for {
-		seq := b.oldest + 1
-		item := b.Find(seq)
-
-		if item == nil || (b.itemAcked != nil && !b.itemAcked(seq, item)) {
-			break
-		}
-
-		b.oldest++
-	}
-
-	seq := b.oldest
-	item := b.Find(seq)
-
-	if item == nil || (b.itemAcked != nil && !b.itemAcked(seq, item)) {
-		b.oldest = b.Latest()
-	}
-}
-
 // Remove invalidates items and entries stored by the sequence number seq.
 func (b *Buffer) Remove(seq uint16) {
 	b.indices[seq%b.Len()] = math.MaxUint32
-	b.updateOldest()
 }
 
 // RemoveRange invalidates all items and entries with sequence numbers in the range [start, end].
@@ -172,19 +123,11 @@ func (b *Buffer) RemoveRange(start, end uint16) {
 
 	emptyBufferIndices(first)
 	emptyBufferIndices(second)
-
-	b.updateOldest()
 }
 
 // GenerateLatestBitset32 calls GenerateBitset32 on the latest known sequence number.
 func (b *Buffer) GenerateLatestBitset32() (ack uint16, ackBits uint32) {
 	ack = b.Latest()
-	return ack, b.GenerateBitset32(ack)
-}
-
-// GenerateOldestBitset32 calls GenerateBitset32 on the oldest consecutively-known sequence number.
-func (b *Buffer) GenerateOldestBitset32() (ack uint16, ackBits uint32) {
-	ack = b.Oldest()
 	return ack, b.GenerateBitset32(ack)
 }
 

@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"math"
 	"math/rand"
-	"reflect"
 	"testing"
 	"testing/quick"
 )
@@ -53,68 +52,6 @@ func TestBufferInsertRemove(t *testing.T) {
 	}
 }
 
-func TestBufferOldest(t *testing.T) {
-	buf := NewBuffer(8)
-	require.EqualValues(t, 0, buf.oldest)
-
-	buf.Insert(0, true)
-	require.EqualValues(t, 0, buf.Oldest())
-
-	buf.Insert(3, true)
-	require.EqualValues(t, 0, buf.Oldest())
-
-	buf.Insert(4, true)
-	require.EqualValues(t, 0, buf.Oldest())
-
-	ack, ackBits := buf.GenerateOldestBitset32()
-
-	require.EqualValues(t, buf.Oldest(), ack)
-	for i := 0; i < 32; i++ {
-		if i == 0 {
-			require.True(t, ackBits&(1<<i) != 0)
-		} else {
-			require.True(t, ackBits&(1<<i) == 0)
-		}
-	}
-
-	buf.Insert(1, true)
-	require.EqualValues(t, 1, buf.Oldest())
-
-	buf.Insert(2, true)
-	require.EqualValues(t, 4, buf.Oldest())
-
-	ack, ackBits = buf.GenerateOldestBitset32()
-
-	require.EqualValues(t, buf.Oldest(), ack)
-	for i := 0; i < 32; i++ {
-		if i < 5 {
-			require.True(t, ackBits&(1<<i) != 0)
-		} else {
-			require.True(t, ackBits&(1<<i) == 0)
-		}
-	}
-}
-
-func TestBufferOverdated(t *testing.T) {
-	buf := NewBuffer(4)
-
-	require.False(t, buf.Insert(4, true))
-	require.True(t, buf.Insert(3, true))
-
-	require.False(t, buf.Insert(3+4, true))
-	require.True(t, buf.Insert(3+3, true))
-}
-
-func TestBufferOptions(t *testing.T) {
-	type acked bool
-
-	cond := func(seq uint16, item interface{}) bool { return bool(item.(acked)) }
-	opt := WithBufferItemAcked(cond)
-
-	buf := NewBuffer(4, opt)
-	require.True(t, reflect.ValueOf(cond).Pointer() == reflect.ValueOf(buf.itemAcked).Pointer())
-}
-
 func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 	t.Helper()
 
@@ -144,7 +81,6 @@ func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
 
 		buf := NewBuffer(size)
 		buf.next = end + 1
-		buf.oldest = end
 
 		// Populate buffer items.
 
@@ -228,7 +164,6 @@ func TestBufferRemoveRangeAll(t *testing.T) {
 
 	buf := NewBuffer(size)
 	buf.next = size
-	buf.oldest = size - 1
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i
@@ -259,7 +194,6 @@ func BenchmarkTestBufferRemoveRange(b *testing.B) {
 
 	buf := NewBuffer(size)
 	buf.next = size
-	buf.oldest = size - 1
 
 	for i := uint16(0); i < size; i++ {
 		seq := start + i
