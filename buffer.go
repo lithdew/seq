@@ -75,8 +75,9 @@ func (b *Buffer) Outdated(seq uint16) bool {
 	return LT(seq, b.next-b.Len())
 }
 
-func (b *Buffer) Invalid(seq uint16) bool {
-	return GT(seq, b.oldest+b.Len())
+// Overdated returns true if inserting seq into the buffer is going to roll the buffer over.
+func (b *Buffer) Overdated(seq uint16) bool {
+	return GTE(seq, b.oldest+b.Len())
 }
 
 // Insert inserts a new item into this buffer indexed by seq, should seq not be outdated. It returns true if the
@@ -86,7 +87,7 @@ func (b *Buffer) Insert(seq uint16, item interface{}) bool {
 		return false
 	}
 
-	if b.Invalid(seq) {
+	if b.Overdated(seq) {
 		return false
 	}
 
