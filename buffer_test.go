@@ -146,7 +146,7 @@ func TestBufferGenerateBitset32(t *testing.T) {
 		buf.Insert(i, true)
 	}
 
-	ack, bitset := buf.GenerateBitset32()
+	ack, bitset := buf.GenerateLatestBitset32()
 	require.EqualValues(t, 30, ack)
 
 	for i := uint16(0); i < 32; i, bitset = i+1, bitset>>1 {
@@ -155,7 +155,7 @@ func TestBufferGenerateBitset32(t *testing.T) {
 
 	buf.Insert(buf.next, true)
 
-	ack, bitset = buf.GenerateBitset32()
+	ack, bitset = buf.GenerateLatestBitset32()
 	require.EqualValues(t, 31, ack)
 }
 
@@ -224,7 +224,7 @@ func BenchmarkTestBufferGenerateBitset32(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		ack, bitset = buf.GenerateBitset32()
+		ack, bitset = buf.GenerateLatestBitset32()
 	}
 
 	_, _ = ack, bitset

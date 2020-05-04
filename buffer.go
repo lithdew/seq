@@ -107,13 +107,17 @@ func (b *Buffer) RemoveRange(start, end uint16) {
 	emptyBufferIndices(second)
 }
 
+// GenerateLatestBitset32 calls GenerateBitset32 on the latest known sequence number.
+func (b *Buffer) GenerateLatestBitset32() (ack uint16, ackBits uint32) {
+	ack = b.Latest()
+	return ack, b.GenerateBitset32(ack)
+}
+
 // GenerateBitset32 generates a 32-bit integer representative of a bitset where entries at index i are 1 if there exists
 // an entry in the buffer whose sequence number is equal to the largest sequence number inserted/acknowledged so far
 // minus i. It returns both the largest sequence number known thus far alongside the bitset as an unsigned 16-bit
 // integer and an unsigned 32-bit integer respectively.
-func (b *Buffer) GenerateBitset32() (ack uint16, ackBits uint32) {
-	ack = b.Latest()
-
+func (b *Buffer) GenerateBitset32(ack uint16) (ackBits uint32) {
 	for idx, mask := uint16(0), uint32(1); idx < 32; idx, mask = idx+1, mask<<1 {
 		seq := ack - idx
 
@@ -124,5 +128,5 @@ func (b *Buffer) GenerateBitset32() (ack uint16, ackBits uint32) {
 		ackBits |= mask
 	}
 
-	return ack, ackBits
+	return ackBits
 }
