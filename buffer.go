@@ -5,27 +5,43 @@ import (
 	"math"
 )
 
+// ItemAcked may be passed in via WithBufferItemAcked to set conditions when an item is considered to be acknowledged.
+type ItemAcked func(seq uint16, item interface{}) bool
+
 // Buffer is a fast, fixed-sized rolling buffer that buffers entries based on an unsigned 16-bit integer.
 type Buffer struct {
 	oldest  uint16
 	next    uint16
 	indices []uint32
 	entries []interface{}
+
+	itemAcked ItemAcked
 }
 
 // NewBuffer instantiates a new sequence buffer of size.
-func NewBuffer(size uint16) *Buffer {
+func NewBuffer(size uint16, opts ...BufferOption) *Buffer {
 	if 65536%uint64(size) != 0 {
 		panic("BUG: size provided to seq.NewBuffer() must be divisible by 65536")
 	}
 
-	return &Buffer{next: 0, oldest: math.MaxUint16, indices: make([]uint32, size), entries: make([]interface{}, size)}
+	buf := &Buffer{
+		next:    0,
+		oldest:  0,
+		indices: make([]uint32, size),
+		entries: make([]interface{}, size),
+	}
+
+	for _, opt := range opts {
+		opt(buf)
+	}
+
+	return buf
 }
 
 // Reset resets the buffer.
 func (b *Buffer) Reset() {
 	b.next = 0
-	b.oldest = math.MaxUint16
+	b.oldest = 0
 	emptyBufferIndices(b.indices)
 	emptyBufferEntries(b.entries)
 }
@@ -71,23 +87,23 @@ func (b *Buffer) Exists(seq uint16) bool {
 
 // Outdated returns true if seq is capable of being stored in this buffer based on the largest sequence number
 // that has been inserted/acknowledged so far.
-func (b *Buffer) Outdated(seq uint16) bool {
-	return LT(seq, b.next-b.Len())
+func (b *Buffer) Outdated(seq uint16, size uint16) bool {
+	return LT(seq, b.next-size)
 }
 
 // Overdated returns true if inserting seq into the buffer is going to roll the buffer over.
-func (b *Buffer) Overdated(seq uint16) bool {
-	return GTE(seq, b.oldest+b.Len())
+func (b *Buffer) Overdated(seq uint16, size uint16) bool {
+	return GTE(seq, b.oldest+size)
 }
 
 // Insert inserts a new item into this buffer indexed by seq, should seq not be outdated. It returns true if the
 // insertion is successful.
 func (b *Buffer) Insert(seq uint16, item interface{}) bool {
-	if b.Outdated(seq) {
+	if b.Outdated(seq, b.Len()) {
 		return false
 	}
 
-	if b.Overdated(seq) {
+	if b.Overdated(seq, b.Len()) {
 		return false
 	}
 
@@ -110,11 +126,21 @@ func (b *Buffer) updateLatest(seq uint16) {
 }
 
 func (b *Buffer) updateOldest() {
-	for b.Exists(b.oldest + 1) {
+	for {
+		seq := b.oldest + 1
+		item := b.Find(seq)
+
+		if item == nil || (b.itemAcked != nil && !b.itemAcked(seq, item)) {
+			break
+		}
+
 		b.oldest++
 	}
 
-	if !b.Exists(b.oldest) {
+	seq := b.oldest
+	item := b.Find(seq)
+
+	if item == nil || (b.itemAcked != nil && !b.itemAcked(seq, item)) {
 		b.oldest = b.Latest()
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"math"
 	"math/rand"
+	"reflect"
 	"testing"
 	"testing/quick"
 )
@@ -54,7 +55,7 @@ func TestBufferInsertRemove(t *testing.T) {
 
 func TestBufferOldest(t *testing.T) {
 	buf := NewBuffer(8)
-	require.EqualValues(t, math.MaxUint16, buf.oldest)
+	require.EqualValues(t, 0, buf.oldest)
 
 	buf.Insert(0, true)
 	require.EqualValues(t, 0, buf.Oldest())
@@ -92,6 +93,26 @@ func TestBufferOldest(t *testing.T) {
 			require.True(t, ackBits&(1<<i) == 0)
 		}
 	}
+}
+
+func TestBufferOverdated(t *testing.T) {
+	buf := NewBuffer(4)
+
+	require.False(t, buf.Insert(4, true))
+	require.True(t, buf.Insert(3, true))
+
+	require.False(t, buf.Insert(3+4, true))
+	require.True(t, buf.Insert(3+3, true))
+}
+
+func TestBufferOptions(t *testing.T) {
+	type acked bool
+
+	cond := func(seq uint16, item interface{}) bool { return bool(item.(acked)) }
+	opt := WithBufferItemAcked(cond)
+
+	buf := NewBuffer(4, opt)
+	require.True(t, reflect.ValueOf(cond).Pointer() == reflect.ValueOf(buf.itemAcked).Pointer())
 }
 
 func testRemoveRange(t testing.TB) func(uint16, uint8) bool {
